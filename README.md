@@ -11,7 +11,7 @@ npm install ngx-routable
 ### Resolving
 
 The router comes with a mechanisem to pre-fetch data before the page loads.
-Each route has to declare it has a resolver and a resolver must be an angular service.
+Each route has to declare a resolver and a resolver must be an angular service.
 
 Using a service for each component (or model) does not make sense, it does not scale.
 While this separates the fetching of data from the component it requires having a service
