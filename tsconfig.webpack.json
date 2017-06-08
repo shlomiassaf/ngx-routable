@@ -21,16 +21,7 @@
     "types": [
       "hammerjs",
       "node"
-    ],
-    "baseUrl": "./src",
-    "paths": {
-      "ngx-routable": [
-        "ngx-routable/src/index.ts"
-      ],
-      "ngx-routable/*": [
-        "ngx-routable/src/*"
-      ]
-    }
+    ]
   },
   "exclude": [
     "node_modules",

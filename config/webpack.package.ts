@@ -1,29 +1,39 @@
-const fs = require('fs');
 const path = require('path');
 const helpers = require('./helpers');
 const webpack = require('webpack');
-const jsonfile = require('jsonfile');
 
 
 /**
  * Webpack Plugins
  */
-const DefinePlugin = require('webpack/lib/DefinePlugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TsConfigPathsPlugin = require('awesome-typescript-loader').TsConfigPathsPlugin;
-const UglifyJsPlugin = require('webpack/lib/optimize/UglifyJsPlugin');
 const BannerPlugin = webpack.BannerPlugin;
 const NgcWebpackPlugin = require('ngc-webpack').NgcWebpackPlugin;
 
+import { PackageMetadata, FS_REF } from '../scripts/util';
 
-module.exports = function(metadata) {
+module.exports = function(metadata: PackageMetadata) {
   const banner = `/** 
  * ${metadata.name} Copyright ${new Date().getFullYear()}
  * Licensed under MIT
  */`;
 
+
+  /*
+      The entry point references a file that does not exists at the time of definition.
+      This is the generated angular flat module file which will generate once the angular compiler does its thing.
+      The angular compiler runs before webpack starts via NgcWebpackPlugin so we're safe to assume
+      that the file will be there (unless an error has occurred)
+
+      The original entry point should have been:
+
+      [metadata.umd]: helpers.root(`src/${metadata.dir}/src/index.ts`)
+
+      But this will result in an incorrect bundle since internal aot compiler exports (ɵ) will not bundle.
+   */
   const entry = {
-    [metadata.umd]: helpers.root(`src/${metadata.dir}/src/index.ts`)
+    [metadata.umd]: helpers.root(metadata.tsConfigObj.compilerOptions.outDir, metadata.tsConfigObj.angularCompilerOptions.flatModuleOutFile)
   };
 
   return {
@@ -42,19 +52,27 @@ module.exports = function(metadata) {
     output: {
       path: helpers.root('.'),
       publicPath: '/',
-      filename: `dist_package/${metadata.dir}/bundle/[name].umd.js`,
+      filename: `${FS_REF.PKG_DIST}/${metadata.dir}/${FS_REF.BUNDLE_DIR}/[name].webpack.umd.js`,
       libraryTarget: 'umd',
       library: metadata.name
     },
 
     // require those dependencies but don't bundle them
-    externals: metadata.externals,
+    externals: metadata.externalsWebpack,
 
     module: {
       rules: [
         {
           test: /\.ts$/,
-          loader: `awesome-typescript-loader?{configFileName: ".tsconfig.tmp.json", declaration: false}`,
+          use: [
+            {
+              loader: `awesome-typescript-loader`,
+              options: {
+                configFileName: '.tsconfig.tmp.json',
+                declaration: false
+              }
+            }
+          ],
           exclude: [/\.e2e\.ts$/]
         }
       ]
@@ -85,30 +103,8 @@ module.exports = function(metadata) {
       }),
 
       new CopyWebpackPlugin([
-        { from: 'README.md', to: helpers.root(`./dist_package/${metadata.dir}`) },
-      ]),
-
-      function() {
-        // THIS FILE IS MERGED INTO package.json AND COPIED TO dist_package
-        // IT ONLY MERGE THE TOP-LEVEL PROPERTIES (NOT DEEP)
-        this.plugin('done', function(stats) {
-          const pkgDest = helpers.root('dist_package', metadata.dir, 'package.json');
-
-          const merged = Object.assign(
-            jsonfile.readFileSync(helpers.root('package.json')),
-            jsonfile.readFileSync(helpers.root('src', metadata.dir, 'package.json'))
-          );
-
-          delete merged.scripts;
-          delete merged.devDependencies;
-          if (!merged.main) {
-            merged.main = `bundle/${metadata.umd}.umd.js`;
-          }
-
-          jsonfile.writeFileSync(pkgDest, merged, {spaces: 2});
-
-        })
-      }
+        { from: 'README.md', to: helpers.root(`./${FS_REF.PKG_DIST}/${metadata.dir}`) },
+      ])
     ]
   };
 };

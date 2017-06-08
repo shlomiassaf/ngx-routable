@@ -4,13 +4,13 @@
 
 const webpack = require('webpack');
 const helpers = require('./helpers');
+require('ts-node/register');
 
 /**
  * Webpack Plugins
  *
  * problem with copy-webpack-plugin
  */
-const AssetsPlugin = require('assets-webpack-plugin');
 const NormalModuleReplacementPlugin = require('webpack/lib/NormalModuleReplacementPlugin');
 const ContextReplacementPlugin = require('webpack/lib/ContextReplacementPlugin');
 const CommonsChunkPlugin = require('webpack/lib/optimize/CommonsChunkPlugin');
@@ -24,17 +24,20 @@ const ScriptExtHtmlWebpackPlugin = require('script-ext-html-webpack-plugin');
 const ngcWebpack = require('ngc-webpack');
 //const PreloadWebpackPlugin = require('preload-webpack-plugin');
 
+const util = require('../scripts/util');
+
 /**
  * Webpack Constants
  */
 const HMR = helpers.hasProcessFlag('hot');
 const AOT = process.env.BUILD_AOT || helpers.hasNpmFlag('aot');
 const METADATA = {
-  title: 'Angular2 Webpack Starter by @gdi2290 from @AngularClass',
+  title: 'Angular library starter',
   baseUrl: '/',
   isDevServer: helpers.isWebpackDevServer(),
   HMR: HMR
 };
+
 
 /**
  * Webpack configuration
@@ -43,6 +46,17 @@ const METADATA = {
  */
 module.exports = function (options) {
   isProd = options.env === 'production';
+
+
+  const baseUrl = `./${util.FS_REF.SRC_CONTAINER}`;
+  const scope = util.libConfig.scope ? `${util.libConfig.scope}/` : '';
+
+  const paths = util.libConfig.packages.reduce((curr, pkg) => {
+    curr[scope + pkg] = [`${scope + pkg}/src/index.ts`];
+    curr[`${scope + pkg}/*`] = [`${scope + pkg}/src/*`];
+    return curr;
+  }, {});
+
   return {
 
     /**
@@ -87,9 +101,10 @@ module.exports = function (options) {
        */
       modules: [helpers.root('src'), helpers.root('node_modules')],
 
-      alias: {
-        'ngx-routable': `ngx-routable/src`
-      }
+      alias: util.libConfig.packages.reduce((curr, pkg) => {
+        curr[scope + pkg] = `${scope + pkg}/src`;
+        return curr;
+      }, {})
     },
 
     /**
@@ -139,7 +154,9 @@ module.exports = function (options) {
               loader: 'awesome-typescript-loader',
               options: {
                 configFileName: 'tsconfig.webpack.json',
-                useCache: !isProd
+                useCache: !isProd,
+                baseUrl,
+                paths
               }
             },
             {
