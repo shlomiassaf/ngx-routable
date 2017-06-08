@@ -170,7 +170,7 @@ export function tsConfigUpdate<T extends any>(config: T, meta: PackageMetadata):
     strictMetadataEmit: true,
     skipTemplateCodegen: true,
     flatModuleOutFile: `${meta.umd}${FS_REF.NG_FLAT_MODULE_EXT}.js`,
-    flatModuleId: meta.name
+    flatModuleId: meta.dir // needs to be the dir name, if has scope add it as well.
   };
 
   config.compilerOptions.baseUrl = `./${FS_REF.SRC_CONTAINER}`;
