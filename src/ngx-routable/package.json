@@ -1,0 +1,16 @@
+{
+  "name": "ngx-routable",
+  "version": "1.0.0-alpha.1",
+  "description": "Component driven data resolver for angular router",
+  "module": "index.js",
+  "typings": "index.d.ts",
+  "keywords": [
+    "angular",
+    "router"
+  ],
+  "dependencies": {},
+  "peerDependencies": {
+    "rxjs": "^5.3.1",
+    "@angular/core": "^4.0.0"
+  }
+}
