@@ -4,6 +4,10 @@ Component metadata driven routing hooks for angular
 
 > Use metadata to declaratively set the routing behaviors of a component.
 
+```
+npm install ngx-routable
+```
+
 ### Resolving
 
 The router comes with a mechanisem to pre-fetch data before the page loads.
