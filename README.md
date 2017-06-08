@@ -90,13 +90,13 @@ export const ROUTES: Routes = [
 RouteActivated is fired BEFORE angular's `OnInit` lifecycle hook. (4.1.x and down see note below)
 
 > If you are running angular 4.1.x and below RouteActivated will fire AFTER angular's lifecycle hooks.
-This means that the hook will fire after `AfterViewInit` (this after `OnInit` as well).
+This means that the hook will fire after `AfterViewInit` (thus after `OnInit` as well).
 
 The parameters in `ngOnRouteActivated` are both optional so you can omit them in the implementation.
 
-> The sharp eyed developers probably noticed that you can use `ngOnRouteActivated`
+> The sharp eyed developer probably noticed that you can use `ngOnRouteActivated`
 to assign the data manually, while this is true it is not recommended.
-There are other methods to achieve this.
+There are other methods to achieve that.
 
 #### Controlling the assignment logic
 Up until this point assigning was done by applying the whole resolved data to a property on the instance.
