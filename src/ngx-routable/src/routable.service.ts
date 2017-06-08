@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, ResolveData } from '@angular/router';
 
 import { RoutableMetadataArgs } from './metadata';
 import { RoutableBase } from './routable';
 
-const ASSIGN_DATA_KEY = '$ASSIGN_DATA_KEY$' + Date.now();
+const ASSIGN_DATA_KEY = '$ASSIGN_DATA_KEY$';
 // TODO: move to Symbols if/when the router supports them as valid ResolveData keys.
 // const ASSIGN_DATA_KEY = Symbol('ROUTABLE ASSIGN DATA KEY');
 
@@ -77,5 +77,5 @@ export class RoutableService extends RoutableBase {
    * ];
    * ```
    */
-  static ASSIGN = { [ASSIGN_DATA_KEY]: RoutableService }
+  static ASSIGN: ResolveData = { $ASSIGN_DATA_KEY$: RoutableService };
 }
