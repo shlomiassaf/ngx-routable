@@ -1,9 +1,12 @@
 import * as fs from 'fs-extra';
 import * as Path from 'path';
+import { execSync as spawn } from 'child_process';
 import * as voca from 'voca';
 import * as jsonfile from 'jsonfile';
 import * as del from 'del';
 import { CompilerOptions } from 'typescript';
+import * as gulpclass from "gulpclass";
+
 import { AngularCompilerOptions } from '@angular/tsc-wrapped';
 
 const uglify = require('uglify-js');
@@ -11,6 +14,10 @@ const zlib = require('zlib');
 
 
 const PKG_METADATA_CACHE: { [dirName: string]: PackageMetadata } = {};
+
+export function log(msg: string): void {
+  process.stdout.write(msg + '\n');
+}
 
 export const FS_REF = {
   PKG_DIST: 'dist_package',
@@ -21,12 +28,17 @@ export const FS_REF = {
   TS_CONFIG_TMP: '.tsconfig.tmp.json',
   SRC_CONTAINER: 'src',
   NG_FLAT_MODULE_EXT: '.ng-flat',
-  TEMP_DIR: '.tmp'
+  TEMP_DIR: '.tmp',
+  VERSION_CACHE: 'version_cache.json'
 };
 
 export function getPackageName(name?: string) {
   const scope = libConfig.scope ? `${libConfig.scope}/` : '';
   return scope + (name || PKG_DIR_NAME);
+}
+
+export function getPackageRoot(dirName: string, ...args: string[]): string {
+  return root(FS_REF.SRC_CONTAINER, getPackageName(dirName), ...args);
 }
 
 /**
@@ -67,6 +79,11 @@ export let PKG_DIR_NAME;
 
 if (libConfig.scope && libConfig.scope.substr(0, 1) !== '@') {
   libConfig.scope = '@' + libConfig.scope;
+}
+
+export interface CommitVersion {
+  commit: string;
+  version: string;
 }
 
 export interface PackageMetadata {
@@ -129,15 +146,15 @@ export function buildPackageMetadata(dirName: string): PackageMetadata {
   const externals = getExternalsRaw(pkgJson);
 
   /*
-      A flat structure is a src library with no directories, only TS files in a flat structure.
-      This type of structure will emit TS code to the dest directory without adding the root folder name (i.e. package directory)
-      and without adding the src container directory. The files will be in the top-level dist folder.
+   A flat structure is a src library with no directories, only TS files in a flat structure.
+   This type of structure will emit TS code to the dest directory without adding the root folder name (i.e. package directory)
+   and without adding the src container directory. The files will be in the top-level dist folder.
 
-      This flag marks such structures so it can be worked around.
+   This flag marks such structures so it can be worked around.
 
-      An exception is a flat structure project that references (imports) another local project
-      This is common in multi-library projects. The externals is compared to the libConfig.packages
-      to find such cases.
+   An exception is a flat structure project that references (imports) another local project
+   This is common in multi-library projects. The externals is compared to the libConfig.packages
+   to find such cases.
    */
 
 
@@ -319,4 +336,83 @@ export function cleanup(): Promise<string[]> {
 export function getModuleName(dirName: string): string {
   const scope = libConfig.scope ? `${libConfig.scope}/` : '';
   return (scope ? scope.substr(1) + '.' : '') + voca.camelCase(dirName);
+}
+
+export function getLastCommit(dirName: string): string {
+  // we check the internal 'src' since other changes (e.g. test folder) does not effect version.
+  return spawn(`git log -n 1 --pretty=format:%H ${getPackageRoot(dirName, FS_REF.SRC_CONTAINER)}`).toString();
+}
+
+export function createLibVersionMap(): { [pkgName: string]: CommitVersion } {
+  return libConfig.packages
+    .reduce( (versionCache, dirName) => {
+      const version = fs.readJsonSync(getPackageRoot(dirName, 'package.json')).version;
+      versionCache[dirName] = {
+        commit: getLastCommit(dirName),
+        version
+      };
+      return versionCache;
+    }, {});
+}
+
+export function detectVersionBump(): { [pkgName: string]: CommitVersion } {
+  const currState = createLibVersionMap();
+
+  try {
+    const lastKnownState = fs.readJsonSync(root(FS_REF.VERSION_CACHE));
+
+    Object.keys(currState).forEach( pkg => {
+      const last = lastKnownState[pkg];
+      if (last) {
+        const curr = currState[pkg];
+        if (last.commit === curr.commit && last.version === curr.version) {
+          delete currState[pkg];
+        }
+      }
+    });
+
+  } catch (err) { }
+
+
+  return currState;
+}
+
+export function commitVersionBump(): void {
+  fs.writeJsonSync(root(FS_REF.VERSION_CACHE), createLibVersionMap());
+}
+
+
+export namespace GulpClass {
+  export interface TaskMetadataArgs {
+    name?: string;
+    desc?: string;
+    dependencies?: string[];
+  }
+
+  export const Gulpclass = gulpclass.Gulpclass;
+
+  export function Task(metaArgs?: TaskMetadataArgs | string): Function {
+    const args = parseMetaArgs(metaArgs);
+    return gulpclass.Task(args.name, args.dependencies);
+  }
+
+  export function SequenceTask(metaArgs?: TaskMetadataArgs | string): Function {
+    const args = parseMetaArgs(metaArgs);
+    return gulpclass.SequenceTask(args.name);
+  }
+
+  export function MergedTask(metaArgs?: TaskMetadataArgs | string): Function {
+    const args = parseMetaArgs(metaArgs);
+    return gulpclass.MergedTask(args.name);
+  }
+
+  function parseMetaArgs(metaArgs?: TaskMetadataArgs | string): TaskMetadataArgs {
+    if (typeof metaArgs === 'string') {
+      return { name: metaArgs };
+    } else if (!metaArgs) {
+      return {}
+    } else {
+      return metaArgs;
+    }
+  }
 }

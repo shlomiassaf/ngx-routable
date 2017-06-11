@@ -2490,7 +2490,7 @@ gulp-util@*, gulp-util@3.0.7, gulp-util@^3.0.0:
     through2 "^2.0.0"
     vinyl "^0.5.0"
 
-gulp@^3.9.1:
+gulp@^3.9.0, gulp@^3.9.1:
   version "3.9.1"
   resolved "https://registry.yarnpkg.com/gulp/-/gulp-3.9.1.tgz#571ce45928dd40af6514fc4011866016c13845b4"
   dependencies:
@@ -2507,6 +2507,14 @@ gulp@^3.9.1:
     tildify "^1.0.0"
     v8flags "^2.0.2"
     vinyl-fs "^0.3.0"
+
+gulpclass@^0.1.2:
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/gulpclass/-/gulpclass-0.1.2.tgz#d26f5c39dc399e11c45a908787c86490bc31e850"
+  dependencies:
+    gulp "^3.9.0"
+    merge2 "^0.3.6"
+    run-sequence "^1.1.5"
 
 gulplog@^1.0.0:
   version "1.0.0"
@@ -3746,6 +3754,10 @@ meow@^3.3.0, meow@^3.7.0:
 merge-descriptors@1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/merge-descriptors/-/merge-descriptors-1.0.1.tgz#b00aaa556dd8b44568150ec9d1b953f3f90cbb61"
+
+merge2@^0.3.6:
+  version "0.3.7"
+  resolved "https://registry.yarnpkg.com/merge2/-/merge2-0.3.7.tgz#18e00a00671090de1165025fc86bd3e77c207f63"
 
 methods@~1.1.2:
   version "1.1.2"
@@ -5171,7 +5183,7 @@ rollup@^0.42.0:
   dependencies:
     source-map-support "^0.4.0"
 
-run-sequence@^1.2.2:
+run-sequence@^1.1.5, run-sequence@^1.2.2:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/run-sequence/-/run-sequence-1.2.2.tgz#5095a0bebe98733b0140bd08dd80ec030ddacdeb"
   dependencies:
