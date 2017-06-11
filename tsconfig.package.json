@@ -22,7 +22,7 @@
       "node"
     ],
     "declaration": true,
-    "outDir": "dist_package/"
+    "outDir": "."
   },
   "exclude": [
     "node_modules",

@@ -2,6 +2,7 @@ import * as fs from 'fs-extra';
 import * as Path from 'path';
 import * as voca from 'voca';
 import * as jsonfile from 'jsonfile';
+import * as del from 'del';
 import { CompilerOptions } from 'typescript';
 import { AngularCompilerOptions } from '@angular/tsc-wrapped';
 
@@ -19,13 +20,15 @@ export const FS_REF = {
   TS_CONFIG_TEMPLATE: 'tsconfig.package.json',
   TS_CONFIG_TMP: '.tsconfig.tmp.json',
   SRC_CONTAINER: 'src',
-  NG_FLAT_MODULE_EXT: '.ng-flat'
+  NG_FLAT_MODULE_EXT: '.ng-flat',
+  TEMP_DIR: '.tmp'
 };
 
 export function getPackageName(name?: string) {
   const scope = libConfig.scope ? `${libConfig.scope}/` : '';
   return scope + (name || PKG_DIR_NAME);
 }
+
 /**
  * Returns an array of external dependencies based on package.json dependencies and peerDependencies
  * @param packageJson
@@ -97,6 +100,18 @@ export interface PackageMetadata {
    */
   externalsWebpack: Array<RegExp | string>;
 
+  /**
+   * The exported module name for UMD bundles
+   *
+   * The default is a camel case version of the name.
+   * When a scope is set it is prefixed without the @ sign and separated by a dot.
+   *
+   * Examples:
+   * my-library: myLibrary
+   * @company/my-library: company.myLibrary
+   */
+  moduleName: string;
+
   isFlatStructure: boolean;
   tsConfig: string;
   tsConfigObj: { compilerOptions: CompilerOptions, angularCompilerOptions: AngularCompilerOptions };
@@ -107,27 +122,43 @@ export function buildPackageMetadata(dirName: string): PackageMetadata {
     return PKG_METADATA_CACHE[dirName];
   }
 
-  const packageSrcPath = Path.join(root(FS_REF.SRC_CONTAINER, dirName, 'src'));
-  const pkgJson = jsonfile.readFileSync(root(FS_REF.SRC_CONTAINER, dirName, 'package.json'));
-
-  const isFlatStructure = !fs.readdirSync(packageSrcPath)
-    .some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
-
   const scope = libConfig.scope ? `${libConfig.scope}/` : '';
+  const packageSrcPath = Path.join(root(FS_REF.SRC_CONTAINER, scope + dirName, 'src'));
+  const pkgJson = jsonfile.readFileSync(root(FS_REF.SRC_CONTAINER, scope + dirName, 'package.json'));
+
+  const externals = getExternalsRaw(pkgJson);
+
+  /*
+   A flat structure is a src library with no directories, only TS files in a flat structure.
+   This type of structure will emit TS code to the dest directory without adding the root folder name (i.e. package directory)
+   and without adding the src container directory. The files will be in the top-level dist folder.
+
+   This flag marks such structures so it can be worked around.
+
+   An exception is a flat structure project that references (imports) another local project
+   This is common in multi-library projects. The externals is compared to the libConfig.packages
+   to find such cases.
+   */
+  const isFlatStructure = !externals.some( e => libConfig.packages.indexOf(e) ) && !fs.readdirSync(packageSrcPath)
+      .some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
+
 
   const meta: PackageMetadata = {
     name: titleCamelCase(dirName),
     dirName,
     dir: scope + dirName,
     umd: dirName,
-    externals: getExternalsRaw(pkgJson),
+    externals,
     externalsWebpack: [/^\@angular\//].concat(getExternalsWebpack(pkgJson)),
     isFlatStructure,
     tsConfig: `./${FS_REF.TS_CONFIG_TMP}`,
-    tsConfigObj: undefined
+    tsConfigObj: undefined,
+    moduleName: getModuleName(dirName)
   };
 
   const tsConfig = tsConfigUpdate(jsonfile.readFileSync(root(FS_REF.TS_CONFIG_TEMPLATE)), meta);
+  tryRunHook(meta.dirName, 'tsconfig', tsConfig);
+
   jsonfile.writeFileSync(root(FS_REF.TS_CONFIG_TMP), tsConfig, {spaces: 2});
   meta.tsConfigObj = tsConfig;
 
@@ -151,19 +182,19 @@ export function tsConfigUpdate<T extends any>(config: T, meta: PackageMetadata):
     config.compilerOptions.outDir +=  '/';
   }
 
-  config.compilerOptions.outDir += `.tmp`;
+  config.compilerOptions.outDir += FS_REF.TEMP_DIR;
 
   if (libConfig.scope) {
     config.compilerOptions.outDir += `/${libConfig.scope}`;
   }
 
   if (meta.isFlatStructure) {
-    config.compilerOptions.outDir += `/${meta.dirName}`;
+    config.compilerOptions.outDir += `/${meta.dirName}/${FS_REF.SRC_CONTAINER}`;
   }
 
   // TODO: check why this go outside of folder
   // config.include = [`./src/${dirName}/src/**/*.ts`];
-  config.files = [`./src/${meta.dir}/src/index.ts`];
+  config.files = [`./src/${meta.dir}/${FS_REF.SRC_CONTAINER}/index.ts`];
 
   config.angularCompilerOptions = {
     annotateForClosureCompiler: true,
@@ -173,11 +204,15 @@ export function tsConfigUpdate<T extends any>(config: T, meta: PackageMetadata):
     flatModuleId: meta.dir // needs to be the dir name, if has scope add it as well.
   };
 
+  const scope = libConfig.scope ? `${libConfig.scope}/` : '';
+
   config.compilerOptions.baseUrl = `./${FS_REF.SRC_CONTAINER}`;
-  config.compilerOptions.paths = {
-    [meta.dir]: [`${meta.dir}/src/index.ts`],
-    [`${meta.dir}/*`]: [`${meta.dir}/src/*`]
-  };
+  config.compilerOptions.paths = libConfig.packages
+    .reduce( (paths, dir) => {
+      paths[scope + dir] = [`${scope + dir}/src/index.ts`];
+      paths[`${scope + dir}/*`] = [`${scope + dir}/src/*`];
+      return paths;
+    }, {});
 
   return config;
 }
@@ -188,16 +223,9 @@ export function tsConfigUpdate<T extends any>(config: T, meta: PackageMetadata):
  * @param meta
  * @return {{from: string, to: string}}
  */
-export function getCopyInstruction(outDir: string, meta: PackageMetadata): { from: string; to: string} {
-  if (!outDir.endsWith(`/${meta.dir}`)) {
-    outDir = Path.join(outDir, meta.dir);
-  }
-
-  let from = Path.join(outDir, 'src');
-  let to = Path.resolve(outDir, '..', '..', meta.dir);
-  if (!fs.existsSync(from)) {
-    from = outDir;
-  }
+export function getCopyInstruction(meta: PackageMetadata): { from: string; to: string} {
+  const from = getOutDir(meta, true);
+  const to = root(FS_REF.PKG_DIST, meta.dir);
   return { from, to };
 }
 
@@ -235,8 +263,18 @@ export function minifyAndGzip(destDir: string, srcNameNoExt: string) {
 }
 
 export function tryRunHook(pkgDir: string,
-                           hookName: 'rollupUMD' | 'rollupFESM' | 'packageJSON',
+                           hookName: 'rollupUMD' | 'rollupFESM' | 'packageJSON' | 'tsconfig',
                            ...args: any[]): void {
+
+  try {
+    const moduleId = require.resolve(root('build_hooks'));
+    const module = require(moduleId);
+    if (typeof module[hookName] === 'function') {
+      module[hookName](...args);
+    }
+  } catch (err) { }
+
+
   try {
     const moduleId = require.resolve(root(FS_REF.SRC_CONTAINER, pkgDir, 'build_hooks'));
     const module = require(moduleId);
@@ -245,4 +283,38 @@ export function tryRunHook(pkgDir: string,
     }
   } catch (err) { }
 
+}
+
+/**
+ * Returns the output directory path TS will emit to.
+ * @param meta
+ * @param srcContainer when true return the 'src' directory inside the output directory, otherwise the root output directory
+ * @param args additional directories / file to add to the path.
+ * @return {string}
+ */
+export function getOutDir(meta: PackageMetadata, srcContainer: boolean, ...args: string[]): string {
+  /*
+   On flat structured projects:
+   - The dirname is part of the output path set in tsconfig
+   - The src container is the root output
+
+   */
+  if (meta.isFlatStructure) {
+    let outDir = root(meta.tsConfigObj.compilerOptions.outDir);
+    if (!srcContainer) {
+      outDir = Path.join(outDir, '..');
+    }
+    return Path.join(outDir, ...args)
+  } else {
+    return root(meta.tsConfigObj.compilerOptions.outDir, meta.dirName, srcContainer ? FS_REF.SRC_CONTAINER : '', ...args);
+  }
+}
+
+export function cleanup(): Promise<string[]> {
+  return del([root(FS_REF.TEMP_DIR), root(FS_REF.TS_CONFIG_TMP)]);
+}
+
+export function getModuleName(dirName: string): string {
+  const scope = libConfig.scope ? `${libConfig.scope}/` : '';
+  return (scope ? scope.substr(1) + '.' : '') + voca.camelCase(dirName);
 }

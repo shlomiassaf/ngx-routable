@@ -8,12 +8,12 @@ import * as util from '../util';
 
 gulp.task('manifest', function () {
   const meta = util.buildPackageMetadata(util.PKG_DIR_NAME);
-  let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-  const copyInst = util.getCopyInstruction(p, meta);
+  const copyInst = util.getCopyInstruction(meta);
 
   const pkgDest = Path.join(copyInst.to, 'package.json');
   const pkgJson = jsonfile.readFileSync(util.root('package.json'));
 
+  delete pkgJson.libConfig;
   delete pkgJson.scripts;
   delete pkgJson.devDependencies;
 

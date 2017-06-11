@@ -11,7 +11,7 @@ const TsConfigPathsPlugin = require('awesome-typescript-loader').TsConfigPathsPl
 const BannerPlugin = webpack.BannerPlugin;
 const NgcWebpackPlugin = require('ngc-webpack').NgcWebpackPlugin;
 
-import { PackageMetadata, FS_REF } from '../scripts/util';
+import { PackageMetadata, FS_REF, getOutDir } from '../scripts/util';
 
 module.exports = function(metadata: PackageMetadata) {
   const banner = `/** 
@@ -33,7 +33,7 @@ module.exports = function(metadata: PackageMetadata) {
       But this will result in an incorrect bundle since internal aot compiler exports (ɵ) will not bundle.
    */
   const entry = {
-    [metadata.umd]: helpers.root(metadata.tsConfigObj.compilerOptions.outDir, metadata.tsConfigObj.angularCompilerOptions.flatModuleOutFile)
+    [metadata.umd]: path.join(getOutDir(metadata, true, metadata.tsConfigObj.angularCompilerOptions.flatModuleOutFile))
   };
 
   return {
@@ -54,7 +54,7 @@ module.exports = function(metadata: PackageMetadata) {
       publicPath: '/',
       filename: `${FS_REF.PKG_DIST}/${metadata.dir}/${FS_REF.BUNDLE_DIR}/[name].webpack.umd.js`,
       libraryTarget: 'umd',
-      library: metadata.name
+      library: metadata.moduleName
     },
 
     // require those dependencies but don't bundle them

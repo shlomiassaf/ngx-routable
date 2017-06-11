@@ -72,4 +72,5 @@ dll/
 *.shim.ngstyle.ts
 
 .tsconfig.tmp.json
+.tmp
 dist_package

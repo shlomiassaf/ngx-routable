@@ -29,23 +29,22 @@ gulp.task('build:webpack', () => {
   return runWebpack
     .done
     .then( () => {
-      let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-      const copyInst = util.getCopyInstruction(p, meta);
+      const p = util.root(meta.tsConfigObj.compilerOptions.outDir);
+      const copyInst = util.getCopyInstruction(meta);
 
       spawn(`mv ${copyInst.from}/* ${copyInst.to}`);
-      spawn(`rm -rf ${Path.resolve(p, '..')}`);
       spawn(`rm -rf ${Path.resolve(p, '..')}`);
 
 
       /*
-          Angular compiler with 'flatModuleOutFile' turned on creates an entry JS file with a matching d.ts
-          file and an aggregated metadata.json file.
+       Angular compiler with 'flatModuleOutFile' turned on creates an entry JS file with a matching d.ts
+       file and an aggregated metadata.json file.
 
-          This is done by creating a corresponding TS file (to the output JS file).
-          The side-effect is a source map reference to the TS file.
+       This is done by creating a corresponding TS file (to the output JS file).
+       The side-effect is a source map reference to the TS file.
 
-          Since the TS is virtual and does not exists we need to remove the comment so the source maps
-          will not break.
+       Since the TS is virtual and does not exists we need to remove the comment so the source maps
+       will not break.
        */
       const flatModuleJsPath = Path.join(copyInst.to, `${meta.umd}${util.FS_REF.NG_FLAT_MODULE_EXT}.js`);
       const withoutComments = convert.removeComments(fs.readFileSync(flatModuleJsPath, 'utf-8'));
@@ -57,8 +56,7 @@ gulp.task('build:webpack', () => {
 gulp.task('build:rollup:fesm', function () {
   const meta = util.buildPackageMetadata(util.PKG_DIR_NAME);
 
-  let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-  const copyInst = util.getCopyInstruction(p, meta);
+  const copyInst = util.getCopyInstruction(meta);
 
   const rollupConfig = {
     external: meta.externals
@@ -84,15 +82,14 @@ gulp.task('build:rollup:fesm', function () {
 gulp.task('build:rollup:umd', function () {
   const meta = util.buildPackageMetadata(util.PKG_DIR_NAME);
 
-  let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-  const copyInst = util.getCopyInstruction(p, meta);
+  const copyInst = util.getCopyInstruction(meta);
 
   const rollupConfig = {
     external: meta.externals,
     globals: {
       typescript: 'ts'
     },
-    moduleName: meta.name
+    moduleName: meta.moduleName
   };
 
   util.tryRunHook(meta.dir, 'rollupUMD', rollupConfig);
@@ -116,8 +113,7 @@ gulp.task('build:rollup:umd', function () {
 gulp.task('sourcemaps', () => {
   const meta = util.buildPackageMetadata(util.PKG_DIR_NAME);
 
-  let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-  const copyInst = util.getCopyInstruction(p, meta);
+  const copyInst = util.getCopyInstruction(meta);
 
   const promises = [`${meta.umd}.es5.js`, /* `${meta.umd}.webpack.umd.js`, */ `${meta.umd}.rollup.umd.js`]
     .map( file => {
@@ -130,9 +126,7 @@ gulp.task('sourcemaps', () => {
 
 gulp.task('minifyAndGzip', () => {
   const meta = util.buildPackageMetadata(util.PKG_DIR_NAME);
-
-  let p = util.root(meta.tsConfigObj.compilerOptions.outDir);
-  const copyInst = util.getCopyInstruction(p, meta);
+  const copyInst = util.getCopyInstruction(meta);
 
   util.minifyAndGzip(Path.join(copyInst.to, util.FS_REF.BUNDLE_DIR), `${meta.umd}.webpack.umd`);
   util.minifyAndGzip(Path.join(copyInst.to, util.FS_REF.BUNDLE_DIR), `${meta.umd}.rollup.umd`);
