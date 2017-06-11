@@ -129,18 +129,18 @@ export function buildPackageMetadata(dirName: string): PackageMetadata {
   const externals = getExternalsRaw(pkgJson);
 
   /*
-   A flat structure is a src library with no directories, only TS files in a flat structure.
-   This type of structure will emit TS code to the dest directory without adding the root folder name (i.e. package directory)
-   and without adding the src container directory. The files will be in the top-level dist folder.
+      A flat structure is a src library with no directories, only TS files in a flat structure.
+      This type of structure will emit TS code to the dest directory without adding the root folder name (i.e. package directory)
+      and without adding the src container directory. The files will be in the top-level dist folder.
 
-   This flag marks such structures so it can be worked around.
+      This flag marks such structures so it can be worked around.
 
-   An exception is a flat structure project that references (imports) another local project
-   This is common in multi-library projects. The externals is compared to the libConfig.packages
-   to find such cases.
+      An exception is a flat structure project that references (imports) another local project
+      This is common in multi-library projects. The externals is compared to the libConfig.packages
+      to find such cases.
    */
-  const isFlatStructure = !externals.some( e => libConfig.packages.indexOf(e) ) && !fs.readdirSync(packageSrcPath)
-      .some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
+  const isFlatStructure = !externals.some( e => libConfig.packages.indexOf(e) > -1 ) && !fs.readdirSync(packageSrcPath)
+    .some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
 
 
   const meta: PackageMetadata = {
