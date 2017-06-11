@@ -139,8 +139,10 @@ export function buildPackageMetadata(dirName: string): PackageMetadata {
       This is common in multi-library projects. The externals is compared to the libConfig.packages
       to find such cases.
    */
-  const isFlatStructure = !externals.some( e => libConfig.packages.indexOf(e) > -1 ) && !fs.readdirSync(packageSrcPath)
-    .some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
+
+
+  const isFlatStructure = !libConfig.packages.map(p => getPackageName(p)).some( p => externals.indexOf(p) > -1)
+    && !fs.readdirSync(packageSrcPath).some( fsItem => fs.statSync(Path.join(packageSrcPath, fsItem)).isDirectory() );
 
 
   const meta: PackageMetadata = {
